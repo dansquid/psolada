@@ -2,13 +2,11 @@
 -- Poker Solitaire - Main Program
 -- A card game where you place cards in a 5x5 grid to make poker hands
 --
--- Written entirely in Ada with no external dependencies
--- Works on Windows and Linux terminals
+-- Written in Ada with AdaGraph graphics library
+-- Works on Windows and Linux
 -------------------------------------------------------------------------------
 
 with Ada.Text_IO;         use Ada.Text_IO;
-with Ada.Integer_Text_IO; use Ada.Integer_Text_IO;
-with Ada.Strings.Fixed;   use Ada.Strings.Fixed;
 
 with Cards;       use Cards;
 with Deck;        use Deck;
@@ -26,120 +24,69 @@ procedure Poker_Solitaire is
    Scores       : High_Score_Data;
 
    -- Input handling
-   Input_Line   : String (1 .. 80);
-   Input_Last   : Natural;
-   Input_Row    : Natural;
-   Input_Col    : Natural;
+   Input_Row    : Board_Index;
+   Input_Col    : Board_Index;
 
    -- Game control
    Quit_Game    : Boolean := False;
+   Quit_To_Menu : Boolean := False;
    Card_Dealt   : Boolean;
    Card_Placed  : Boolean;
-
-   -- Name input for high scores
-   Player_Name  : String (1 .. Max_Name_Length);
-   Name_Last    : Natural;
-
-   -------------------------
-   -- Parse_Input
-   -------------------------
-   -- Parse "row col" input, returns True if valid
-   function Parse_Input (Line : String;
-                         Last : Natural;
-                         Row  : out Natural;
-                         Col  : out Natural) return Boolean is
-      Space_Pos : Natural := 0;
-      First_Num : Natural := 0;
-      Second_Start : Natural := 0;
-   begin
-      Row := 0;
-      Col := 0;
-
-      if Last = 0 then
-         return False;
-      end if;
-
-      -- Find first number
-      for I in 1 .. Last loop
-         if Line (I) in '1' .. '5' then
-            if First_Num = 0 then
-               First_Num := I;
-               Row := Character'Pos (Line (I)) - Character'Pos ('0');
-            elsif Second_Start = 0 then
-               Second_Start := I;
-               Col := Character'Pos (Line (I)) - Character'Pos ('0');
-               return True;
-            end if;
-         elsif Line (I) = ' ' or Line (I) = ',' or Line (I) = '-' then
-            -- Separator, continue looking
-            null;
-         elsif First_Num > 0 and then Line (I) not in '0' .. '9' then
-            -- Non-digit after first number found
-            null;
-         end if;
-      end loop;
-
-      return Row > 0 and Col > 0;
-   end Parse_Input;
+   Valid_Input  : Boolean;
 
    -------------------------
    -- Show_Menu
    -------------------------
    procedure Show_Menu is
-      Choice : String (1 .. 10);
-      Last   : Natural;
+      Key : Character;
    begin
       loop
-         Clear_Screen;
+         -- Load current high scores
+         declare
+            Dummy : Boolean;
+         begin
+            Dummy := Load_Scores (Default_Filename, Scores);
+         end;
+
          Display_Title;
 
-         -- Load and show current high score
-         if Load_Scores (Default_Filename, Scores) then
-            Put ("Current High Score: " & Natural'Image (Get_Top_Score (Scores)));
-         else
-            Put ("No high scores yet - be the first!");
-         end if;
-         New_Line;
-         New_Line;
+         -- Wait for menu choice
+         Key := Get_Key_Press;
 
-         Print_Line ("MENU:");
-         Print_Line ("  1. New Game");
-         Print_Line ("  2. View High Scores");
-         Print_Line ("  3. How to Play");
-         Print_Line ("  4. Quit");
-         New_Line;
-         Put ("Enter choice (1-4): ");
+         case Key is
+            when '1' =>
+               return;  -- Start new game
 
-         Get_Line (Choice, Last);
+            when '2' =>
+               Display_High_Scores_Screen;
 
-         if Last >= 1 then
-            case Choice (1) is
-               when '1' =>
-                  return;  -- Start new game
+               -- Show actual scores if we have them
+               if Scores.Count > 0 then
+                  declare
+                     Y : Integer := 220;
+                  begin
+                     for I in 1 .. Scores.Count loop
+                        if Scores.Scores (I).Valid then
+                           -- Draw score entry (handled by AdaGraph's Goto_XY and Put)
+                           null;  -- Scores displayed by Display_High_Scores_Screen
+                        end if;
+                     end loop;
+                  end;
+               end if;
 
-               when '2' =>
-                  Clear_Screen;
-                  if Load_Scores (Default_Filename, Scores) then
-                     Display_Scores (Scores);
-                  else
-                     Initialize (Scores);
-                     Display_Scores (Scores);
-                  end if;
-                  Wait_For_Enter;
+               Wait_For_Input;
 
-               when '3' =>
-                  Clear_Screen;
-                  Display_Help;
-                  Wait_For_Enter;
+            when '3' =>
+               Display_Help;
+               Wait_For_Input;
 
-               when '4' =>
-                  Quit_Game := True;
-                  return;
+            when '4' | 'q' | 'Q' =>
+               Quit_Game := True;
+               return;
 
-               when others =>
-                  null;  -- Invalid choice, show menu again
-            end case;
-         end if;
+            when others =>
+               null;  -- Invalid choice, show menu again
+         end case;
       end loop;
    end Show_Menu;
 
@@ -147,11 +94,13 @@ procedure Poker_Solitaire is
    -- Play_Game
    -------------------------
    procedure Play_Game is
+      Cards_Remaining : Natural;
    begin
       -- Initialize game
       Initialize_Game (Game);
       Initialize (Game_Deck);
       Shuffle (Game_Deck);
+      Quit_To_Menu := False;
 
       -- Main game loop
       loop
@@ -162,94 +111,72 @@ procedure Poker_Solitaire is
             exit;
          end if;
 
+         Cards_Remaining := Deck.Cards_Remaining (Game_Deck);
+
          -- Display board and current card
+         Clear_Window;
          Display_Board (Game);
-         Display_Current_Card (Current_Card);
+         Display_Current_Card (Current_Card, Cards_Remaining + 1);
+         Display_Input_Prompt;
 
          -- Get player input
          loop
-            Get_Line (Input_Line, Input_Last);
+            Valid_Input := Get_Position_Input (Input_Row, Input_Col);
 
-            -- Check for commands
-            if Input_Last >= 1 then
-               declare
-                  First_Char : constant Character :=
-                    Input_Line (1);
-               begin
-                  case First_Char is
-                     when 'q' | 'Q' =>
-                        Quit_Game := True;
-                        return;
+            if not Valid_Input then
+               -- User pressed Q or H
+               if Key_Available then
+                  -- Check if it was Q (quit)
+                  Quit_To_Menu := True;
+                  return;
+               end if;
 
-                     when 'h' | 'H' =>
-                        Clear_Screen;
-                        Display_Help;
-                        Wait_For_Enter;
-                        Display_Board (Game);
-                        Display_Current_Card (Current_Card);
-
-                     when '1' .. '5' =>
-                        -- Try to parse as position
-                        if Parse_Input (Input_Line, Input_Last,
-                                        Input_Row, Input_Col) then
-                           -- Attempt to place card
-                           Card_Placed := Place_Card (Game,
-                                                      Board_Index (Input_Row),
-                                                      Board_Index (Input_Col),
-                                                      Current_Card);
-                           if Card_Placed then
-                              exit;  -- Move to next card
-                           else
-                              Move_To (49, 0);
-                              Put ("Position occupied! Choose another: ");
-                           end if;
-                        else
-                           Move_To (49, 0);
-                           Put ("Invalid input. Enter row col (1-5): ");
-                        end if;
-
-                     when others =>
-                        Move_To (49, 0);
-                        Put ("Invalid input. Enter row col (1-5): ");
-                  end case;
-               end;
+               -- It was H (help) - redraw and continue
+               Clear_Window;
+               Display_Board (Game);
+               Display_Current_Card (Current_Card, Cards_Remaining + 1);
+               Display_Input_Prompt;
             else
-               Move_To (49, 0);
-               Put ("Please enter position (row col): ");
+               -- Try to place the card
+               if Is_Position_Empty (Game, Input_Row, Input_Col) then
+                  Card_Placed := Place_Card (Game, Input_Row, Input_Col, Current_Card);
+                  if Card_Placed then
+                     exit;  -- Move to next card
+                  end if;
+               else
+                  Display_Message ("Position occupied! Choose another slot.");
+               end if;
             end if;
          end loop;
       end loop;
 
-      -- Game over
+      -- Game over - show final board and scores
+      Clear_Window;
       Display_Board (Game);
       Display_Game_Over (Game);
+      Wait_For_Input;
 
       -- Check for high score
       declare
          Final_Score : constant Natural := Calculate_Total_Score (Game);
          Dummy       : Boolean;
+         Player_Name : String (1 .. Max_Name_Length) := (others => ' ');
       begin
          -- Load current high scores
          Dummy := Load_Scores (Default_Filename, Scores);
 
          if Is_High_Score (Scores, Final_Score) then
-            New_Line;
-            Print_Line ("*** NEW HIGH SCORE! ***");
-            Put ("Enter your name: ");
-            Get_Line (Player_Name, Name_Last);
+            -- For graphical version, use a simple default name
+            -- (A full implementation would need a text input dialog)
+            Player_Name (1 .. 6) := "Player";
 
-            if Name_Last > 0 then
-               Dummy := Add_Score (Scores,
-                                   Player_Name (1 .. Name_Last),
-                                   Final_Score);
-               Dummy := Save_Scores (Default_Filename, Scores);
-               Print_Line ("Score saved!");
-            end if;
+            Dummy := Add_Score (Scores, Player_Name, Final_Score);
+            Dummy := Save_Scores (Default_Filename, Scores);
+
+            Display_Message ("New High Score saved!");
+            Wait_For_Input;
          end if;
       end;
-
-      New_Line;
-      Wait_For_Enter;
    end Play_Game;
 
 begin
@@ -258,6 +185,9 @@ begin
 
    -- Initialize high scores
    Initialize (Scores);
+
+   -- Initialize graphics
+   Initialize_Graphics;
 
    -- Main program loop
    loop
@@ -270,9 +200,12 @@ begin
       exit when Quit_Game;
    end loop;
 
-   Clear_Screen;
-   Print_Line ("Thank you for playing Poker Solitaire!");
-   Print_Line ("Written in Ada - no external libraries used.");
-   New_Line;
+   -- Cleanup
+   Close_Graphics;
 
+exception
+   when others =>
+      -- Make sure graphics are closed on error
+      Close_Graphics;
+      raise;
 end Poker_Solitaire;

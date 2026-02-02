@@ -1,6 +1,6 @@
 #===============================================================================
 # Makefile for Poker Solitaire
-# Works on Linux, macOS, and Windows (with MinGW/MSYS2)
+# Works on Linux, macOS, and Windows (with MinGW/MSYS2 + X11)
 #===============================================================================
 
 # Directories
@@ -11,6 +11,9 @@ BIN_DIR = bin
 # Compiler settings
 ADA_COMPILER = gnatmake
 ADA_FLAGS = -gnat2012 -gnatwa -gnato -fstack-check -g
+
+# Linker flags for X11
+LINK_FLAGS = -largs -lX11
 
 # Main target name
 TARGET = poker_solitaire
@@ -42,7 +45,7 @@ all: dirs
 		gprbuild -P poker_solitaire.gpr -j0; \
 	else \
 		echo "Building with gnatmake..."; \
-		cd $(SRC_DIR) && $(ADA_COMPILER) $(ADA_FLAGS) -o ../$(EXECUTABLE) $(TARGET).adb -D ../$(OBJ_DIR); \
+		cd $(SRC_DIR) && $(ADA_COMPILER) $(ADA_FLAGS) -o ../$(EXECUTABLE) $(TARGET).adb -D ../$(OBJ_DIR) $(LINK_FLAGS); \
 	fi
 	@echo ""
 	@echo "Build successful! Run with: $(EXECUTABLE)"
@@ -75,4 +78,6 @@ help:
 	@echo "  make run    - Build and run the game"
 	@echo "  make help   - Show this help message"
 	@echo ""
-	@echo "Requirements: GNAT Ada compiler (gprbuild or gnatmake)"
+	@echo "Requirements:"
+	@echo "  - GNAT Ada compiler (gprbuild or gnatmake)"
+	@echo "  - X11 development libraries (libx11-dev on Debian/Ubuntu)"

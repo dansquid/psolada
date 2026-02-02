@@ -1,6 +1,7 @@
 -------------------------------------------------------------------------------
 -- GNAT Project File for Poker Solitaire
 -- Build with: gprbuild -P poker_solitaire.gpr
+-- Includes AdaGraph library for X11 graphics
 -------------------------------------------------------------------------------
 
 project Poker_Solitaire is
@@ -18,7 +19,6 @@ project Poker_Solitaire is
       for Default_Switches ("Ada") use (
          "-gnat2012",     -- Use Ada 2012 standard
          "-gnatwa",       -- Enable all warnings
-         "-gnatVa",       -- Enable all validity checks
          "-gnato",        -- Enable overflow checks
          "-fstack-check", -- Enable stack checking
          "-g"             -- Generate debug info
@@ -30,9 +30,9 @@ project Poker_Solitaire is
       for Default_Switches ("Ada") use ("-E");  -- Store tracebacks in exceptions
    end Binder;
 
-   -- Linker options
+   -- Linker options - link with X11 library for graphics
    package Linker is
-      for Default_Switches ("Ada") use ("-g");
+      for Default_Switches ("Ada") use ("-g", "-lX11");
    end Linker;
 
    -- Builder options

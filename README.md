@@ -1,6 +1,6 @@
 # Poker Solitaire
 
-A classic card game written entirely in Ada with ASCII graphics. Works on both Windows and Linux terminals.
+A classic card game written in Ada with graphical display using X11. Features proper card rendering with suit symbols and colors.
 
 ## Game Description
 
@@ -25,36 +25,56 @@ Poker Solitaire is a patience/solitaire card game where you place 25 cards from 
 **Good Score:** 60-80 points
 **Expert Score:** 100+ points
 
+## Screenshots
+
+The game features:
+- Graphical card display with proper suit symbols (Hearts, Diamonds, Clubs, Spades)
+- Red suits (Hearts, Diamonds) and black suits (Clubs, Spades)
+- Green card table background
+- Real-time score display
+- Mouse click or keyboard input for card placement
+
 ## Requirements
 
-- GNAT Ada compiler (part of GCC or available from AdaCore)
-- A terminal that supports ANSI escape codes (most modern terminals)
+### Linux
 
-### Installing GNAT
+- GNAT Ada compiler (part of GCC or available from AdaCore)
+- X11 development libraries
+- An X11 display server (standard on most Linux desktops)
 
 **Ubuntu/Debian:**
 ```bash
-sudo apt install gnat gprbuild
+sudo apt install gnat gprbuild libx11-dev
 ```
 
 **Fedora:**
 ```bash
-sudo dnf install gcc-gnat gprbuild
+sudo dnf install gcc-gnat gprbuild libX11-devel
 ```
 
 **Arch Linux:**
 ```bash
-sudo pacman -S gcc-ada
+sudo pacman -S gcc-ada libx11
 ```
 
-**macOS (Homebrew):**
+### Windows
+
+On Windows, you need an X11 server:
+- **WSL2 with WSLg** (recommended) - Graphics work automatically
+- **MSYS2** with X11 packages and VcXsrv/Xming
+- Or use WSL2 and run the Linux version
+
+**Using MSYS2:**
+```bash
+pacman -S mingw-w64-x86_64-gcc-ada mingw-w64-x86_64-libx11
+```
+
+### macOS
+
 ```bash
 brew install gnat
+# X11 via XQuartz: brew install --cask xquartz
 ```
-
-**Windows:**
-- Download from [AdaCore](https://www.adacore.com/download)
-- Or use MSYS2: `pacman -S mingw-w64-x86_64-gcc-ada`
 
 ## Building
 
@@ -66,14 +86,9 @@ chmod +x build.sh
 ./build.sh
 ```
 
-**Windows:**
+**Windows (MSYS2):**
 ```cmd
 build.bat
-```
-
-### Using Make
-```bash
-make
 ```
 
 ### Using gprbuild directly
@@ -86,7 +101,9 @@ gprbuild -P poker_solitaire.gpr
 ```bash
 mkdir -p obj bin
 cd src
-gnatmake -gnat2012 -gnatwa -o ../bin/poker_solitaire poker_solitaire.adb -D ../obj
+gnatmake -gnat2012 -gnatwa -gnato poker_solitaire.adb \
+    -o ../bin/poker_solitaire -D ../obj \
+    -largs -lX11
 ```
 
 ## Running the Game
@@ -96,44 +113,43 @@ gnatmake -gnat2012 -gnatwa -o ../bin/poker_solitaire poker_solitaire.adb -D ../o
 ./bin/poker_solitaire
 ```
 
-**Windows:**
+**Windows (with X11 server running):**
 ```cmd
 bin\poker_solitaire.exe
 ```
 
 ## How to Play
 
-1. Start a new game from the main menu
-2. A card will be dealt from the shuffled deck
-3. Enter a position to place the card (e.g., `2 3` for row 2, column 3)
-4. Positions are numbered 1-5 for both rows and columns
+1. Start a new game from the main menu (press '1')
+2. A card will be displayed - this is the card to place
+3. **Click on an empty slot** to place the card there
+4. Or **type row and column numbers** (1-5 each)
 5. Once placed, cards cannot be moved
 6. After placing all 25 cards, your hands are scored
 7. Try to beat your high score!
 
-### Commands During Play
+### Controls
 
-- `row col` - Place card at position (e.g., `2 3`)
-- `h` - Show help
-- `q` - Quit game
+| Input | Action |
+|-------|--------|
+| Mouse Click | Place card in clicked slot |
+| 1-5, 1-5 | Type row then column number |
+| H | Show help screen |
+| Q | Quit game |
 
 ## Project Structure
 
 ```
 poker_solitaire/
 ├── src/
-│   ├── cards.ads          # Card type definitions
-│   ├── cards.adb          # Card operations
-│   ├── deck.ads           # Deck management interface
-│   ├── deck.adb           # Deck with RNG implementation
-│   ├── poker_hands.ads    # Hand evaluation interface
-│   ├── poker_hands.adb    # Poker hand evaluation logic
-│   ├── game_board.ads     # 5x5 grid interface
-│   ├── game_board.adb     # Game board operations
-│   ├── display.ads        # ASCII display interface
-│   ├── display.adb        # Terminal display implementation
-│   ├── high_scores.ads    # High score management interface
-│   ├── high_scores.adb    # Score file operations
+│   ├── adagraph.ads       # Graphics library interface
+│   ├── adagraph.adb       # X11 graphics implementation
+│   ├── cards.ads/adb      # Card type definitions
+│   ├── deck.ads/adb       # Deck management with RNG
+│   ├── poker_hands.ads/adb # Hand evaluation logic
+│   ├── game_board.ads/adb # 5x5 grid management
+│   ├── display.ads/adb    # Graphical display using AdaGraph
+│   ├── high_scores.ads/adb # Score file operations
 │   └── poker_solitaire.adb # Main program
 ├── obj/                   # Compiled objects (created by build)
 ├── bin/                   # Executable output (created by build)
@@ -147,10 +163,22 @@ poker_solitaire/
 ## Technical Details
 
 - **Language:** Ada 2012
-- **External Dependencies:** None (pure standard Ada)
-- **Graphics:** ASCII art using ANSI escape codes
+- **Graphics:** Custom AdaGraph library using X11 (Xlib)
+- **External Dependencies:** libX11 (X Window System)
 - **Random Number Generator:** Custom Linear Congruential Generator seeded with system time
 - **High Scores:** Stored in `poker_solitaire_scores.dat`
+- **Window Size:** 900x700 pixels
+- **Card Rendering:** Graphical suit symbols with proper colors
+
+## AdaGraph Library
+
+This project includes a custom AdaGraph implementation that provides:
+- Window creation and management
+- Basic drawing primitives (lines, boxes, circles)
+- Color support (16-color palette)
+- Text output
+- Mouse and keyboard input
+- Cross-platform potential (currently X11)
 
 ## License
 
